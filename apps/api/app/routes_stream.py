@@ -44,7 +44,7 @@ async def chat_stream(
         db.flush()
 
     lexical = lexical_search(db, str(workspace_id), payload.question)
-    dense = vector_search(db, str(workspace_id), payload.question, embedding_provider)
+    dense = await vector_search(db, str(workspace_id), payload.question, embedding_provider)
     hits = reranker.rerank(payload.question, reciprocal_rank_fusion(dense, lexical), 5)
     result = await generate_grounded_answer(payload.question, hits, provider)
 
