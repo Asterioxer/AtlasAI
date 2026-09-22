@@ -1,15 +1,66 @@
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+import json
+from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
+
+from .auth import AuthContext, require_auth, require_workspace_access
 from .chat_schemas import ChatRequest
+from .conversation_models import Conversation, Message
+from .db import get_db
+from .models import Workspace
+from .services.chat import generate_grounded_answer
+from .services.database_retrieval import lexical_search, vector_search
+from .services.embeddings import DeterministicEmbeddingProvider
 from .services.llm import DeterministicLLMProvider
+from .services.retrieval import reciprocal_rank_fusion
+from .services.reranking import Reranker
 from .services.streaming import stream_text
 
 router = APIRouter(prefix="/api/v1")
 provider = DeterministicLLMProvider()
+embedding_provider = DeterministicEmbeddingProvider()
+reranker = Reranker()
 
 
 @router.post("/workspaces/{workspace_id}/chat/stream")
-async def chat_stream(workspace_id: str, payload: ChatRequest):
-    result = await provider.generate(payload.question)
-    return StreamingResponse(stream_text(result.text), media_type="text/plain")
+async def chat_stream(
+    workspace_id: UUID,
+    payload: ChatRequest,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_auth),
+):
+    if db.get(Workspace, workspace_id) is None:
+        raise HTTPException(404, "Workspace not found")
+    require_workspace_access(workspace_id, auth, db)
+
+    conversation = db.get(Conversation, payload.conversation_id) if payload.conversation_id else None
+    if conversation is not None and conversation.workspace_id != workspace_id:
+        raise HTTPException(400, "Conversation does not belong to workspace")
+    if conversation is None:
+        conversation = Conversation(workspace_id=workspace_id)
+        db.add(conversation)
+        db.flush()
+
+    lexical = lexical_search(db, str(workspace_id), payload.question)
+    dense = vector_search(db, str(workspace_id), payload.question, embedding_provider)
+    hits = reranker.rerank(payload.question, reciprocal_rank_fusion(dense, lexical), 5)
+    result = await generate_grounded_answer(payload.question, hits, provider)
+
+    db.add(Message(conversation_id=conversation.id, role="user", content=payload.question))
+    db.add(Message(conversation_id=conversation.id, role="assistant", content=result.response.text))
+    db.commit()
+
+    citations = [
+        {"chunk_id": c.chunk_id, "source_id": c.source_id, "document_id": c.document_id, "score": c.score}
+        for c in result.citations
+    ]
+
+    async def events():
+        yield f"event: conversation\ndata: {json.dumps({'conversation_id': str(conversation.id)})}\n\n"
+        async for chunk in stream_text(result.response.text):
+            yield f"data: {json.dumps({'text': chunk})}\n\n"
+        yield f"event: citations\ndata: {json.dumps({'citations': citations})}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
