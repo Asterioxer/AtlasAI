@@ -28,15 +28,9 @@ async def upload_document(
     document = Document(source_id=source_id, title=parsed.title, content=parsed.content)
     db.add(document)
     db.flush()
-    for item in parsed.chunks:
-        db.add(
-            Chunk(
-                document_id=document.id,
-                content=item.content,
-                chunk_index=item.index,
-                embedding=embedding_provider.embed(item.content),
-            )
-        )
+    vectors = await embedding_provider.embed([item.content for item in parsed.chunks])
+    for item, embedding in zip(parsed.chunks, vectors, strict=True):
+        db.add(Chunk(document_id=document.id, content=item.content, chunk_index=item.index, embedding=embedding))
     db.commit()
     db.refresh(document)
     return {"id": str(document.id), "title": document.title, "chunks_created": len(parsed.chunks)}
