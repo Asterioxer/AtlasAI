@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .auth import AuthContext, require_auth, require_workspace_access
 from .conversation_models import Conversation, Message
 from .conversation_schemas import ConversationRead, MessageCreate, MessageRead
 from .db import get_db
@@ -13,9 +14,10 @@ router = APIRouter(prefix="/api/v1")
 
 
 @router.post("/workspaces/{workspace_id}/conversations", response_model=ConversationRead, status_code=201)
-def create_conversation(workspace_id: UUID, db: Session = Depends(get_db)):
+def create_conversation(workspace_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(require_auth)):
     if db.get(Workspace, workspace_id) is None:
         raise HTTPException(404, "Workspace not found")
+    require_workspace_access(workspace_id, auth, db)
     conversation = Conversation(workspace_id=workspace_id)
     db.add(conversation)
     db.commit()
@@ -24,27 +26,37 @@ def create_conversation(workspace_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/workspaces/{workspace_id}/conversations", response_model=list[ConversationRead])
-def list_conversations(workspace_id: UUID, db: Session = Depends(get_db)):
+def list_conversations(workspace_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(require_auth)):
     if db.get(Workspace, workspace_id) is None:
         raise HTTPException(404, "Workspace not found")
+    require_workspace_access(workspace_id, auth, db)
     return db.scalars(
         select(Conversation).where(Conversation.workspace_id == workspace_id).order_by(Conversation.created_at.desc())
     ).all()
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list[MessageRead])
-def list_messages(conversation_id: UUID, db: Session = Depends(get_db)):
-    if db.get(Conversation, conversation_id) is None:
+def list_messages(conversation_id: UUID, db: Session = Depends(get_db), auth: AuthContext = Depends(require_auth)):
+    conversation = db.get(Conversation, conversation_id)
+    if conversation is None:
         raise HTTPException(404, "Conversation not found")
+    require_workspace_access(conversation.workspace_id, auth, db)
     return db.scalars(
         select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at.asc())
     ).all()
 
 
 @router.post("/conversations/{conversation_id}/messages", response_model=MessageRead, status_code=201)
-def create_message(conversation_id: UUID, payload: MessageCreate, db: Session = Depends(get_db)):
-    if db.get(Conversation, conversation_id) is None:
+def create_message(
+    conversation_id: UUID,
+    payload: MessageCreate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_auth),
+):
+    conversation = db.get(Conversation, conversation_id)
+    if conversation is None:
         raise HTTPException(404, "Conversation not found")
+    require_workspace_access(conversation.workspace_id, auth, db)
     message = Message(conversation_id=conversation_id, **payload.model_dump())
     db.add(message)
     db.commit()
