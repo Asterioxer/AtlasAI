@@ -4,13 +4,10 @@ from abc import ABC, abstractmethod
 class EmbeddingProvider(ABC):
     @abstractmethod
     async def embed(self, texts: list[str]) -> list[list[float]]:
-        """Return one embedding vector per input text."""
         raise NotImplementedError
 
 
 class DeterministicEmbeddingProvider(EmbeddingProvider):
-    """Small deterministic provider for tests and local plumbing only."""
-
     def __init__(self, dimensions: int = 8) -> None:
         if dimensions <= 0:
             raise ValueError("dimensions must be positive")

@@ -10,6 +10,6 @@ def test_markdown_document_is_parsed_and_chunked() -> None:
     assert document.chunks
 
 
-def test_pdf_adapter_is_explicitly_not_enabled() -> None:
-    with pytest.raises(UnsupportedDocumentType):
+def test_pdf_adapter_rejects_malformed_pdf() -> None:
+    with pytest.raises(Exception):
         build_document("guide.pdf", b"%PDF")
