@@ -1,4 +1,7 @@
+from io import BytesIO
 from pathlib import Path
+
+from pypdf import PdfReader
 
 
 class UnsupportedDocumentType(ValueError):
@@ -10,7 +13,6 @@ def parse_document(filename: str, content: bytes) -> str:
     if suffix in {".md", ".markdown", ".txt"}:
         return content.decode("utf-8")
     if suffix == ".pdf":
-        raise UnsupportedDocumentType(
-            "PDF extraction adapter is not enabled yet; install the PDF parser in the ingestion worker."
-        )
+        reader = PdfReader(BytesIO(content))
+        return "\n\n".join(page.extract_text() or "" for page in reader.pages).strip()
     raise UnsupportedDocumentType(f"Unsupported document type: {suffix or 'unknown'}")
