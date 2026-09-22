@@ -48,8 +48,7 @@ export default function ChatWorkspace() {
     (async () => {
       try {
         const rows = await api("/api/v1/workspaces");
-        let current = rows[0] as Workspace | undefined;
-        if (!current) current = await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "AtlasAI Demo" }) });
+        const current: Workspace = rows[0] ?? await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "AtlasAI Demo" }) });
         setWorkspace(current);
         await refresh(current.id);
       } catch (e) { setError(e instanceof Error ? e.message : "Failed to initialize workspace"); }
