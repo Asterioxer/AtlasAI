@@ -1,0 +1,21 @@
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+
+class ChatRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=4000)
+    conversation_id: UUID | None = None
+
+
+class Citation(BaseModel):
+    chunk_id: str
+    source_id: str
+    document_id: str
+    score: float
+
+
+class ChatResponse(BaseModel):
+    answer: str
+    model: str
+    citations: list[Citation]
