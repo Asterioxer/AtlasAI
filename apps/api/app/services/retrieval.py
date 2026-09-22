@@ -18,7 +18,7 @@ def reciprocal_rank_fusion(*ranked_lists: list[RetrievalHit], k: int = 60) -> li
             representatives.setdefault(hit.chunk_id, hit)
 
     return sorted(
-        (RetrievalHit(h.chunk_id, scores[h.chunk_id], h.source_id, h.document_id) for h in scores),
+        (RetrievalHit(representatives[chunk_id].chunk_id, score, representatives[chunk_id].source_id, representatives[chunk_id].document_id) for chunk_id, score in scores.items()),
         key=lambda hit: hit.score,
         reverse=True,
     )
