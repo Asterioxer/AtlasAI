@@ -23,10 +23,10 @@ def lexical_search(db: Session, workspace_id: str, query: str, limit: int = 8) -
     return [RetrievalHit(str(r.chunk_id), float(r.score), str(r.source_id), str(r.document_id)) for r in rows]
 
 
-def vector_search(
+async def vector_search(
     db: Session, workspace_id: str, query: str, provider: EmbeddingProvider, limit: int = 8
 ) -> list[RetrievalHit]:
-    embedding = provider.embed(query)
+    embedding = (await provider.embed([query]))[0]
     vector = "[" + ",".join(str(float(v)) for v in embedding) + "]"
     rows = db.execute(
         text("""
