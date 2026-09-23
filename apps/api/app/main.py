@@ -1,8 +1,9 @@
 import time
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
+from .config import settings
 from .routes import router
 from .routes_chat import router as chat_router
 from .routes_conversations import router as conversations_router
@@ -13,6 +14,16 @@ from .routes_observability import router as observability_router
 from .services.observability import record_metric, request_id, tracer
 
 app = FastAPI(title="AtlasAI API", version="0.2.0")
+
+if settings.cors_origin_list:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 app.include_router(router)
 app.include_router(chat_router)
 app.include_router(conversations_router)
@@ -50,3 +61,8 @@ async def request_observability(request: Request, call_next):
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/ready")
+async def ready() -> dict[str, str]:
+    return {"status": "ready"}
