@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     postgres_user: str = "atlasai"
     postgres_password: str = "atlasai"
     redis_url: str = "redis://localhost:6379/0"
+    auth_mode: str = "local"
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    jwt_issuer: str = ""
+    jwt_audience: str = ""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
