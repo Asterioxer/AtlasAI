@@ -2,7 +2,7 @@
 
 Production-oriented enterprise knowledge and RAG platform for grounded, cited answers over heterogeneous knowledge sources.
 
-> **Status:** Core platform and production-hardening foundations are complete. The next milestone is deployment on a free-tier split stack and then continued production/AI engineering expansion.
+> **Status:** Core platform, AI product layer, observability, production hardening, and hosted deployment adapters are implemented. The next gate is live infrastructure provisioning and end-to-end smoke testing.
 
 ## What AtlasAI does
 
@@ -63,6 +63,13 @@ The platform is designed around measurable retrieval quality, provider-neutral m
   - Multi-service Docker Compose stack
   - CI validation for PostgreSQL/pgvector, Redis, migrations, API tests and production container builds
   - Deployment and release guidance
+
+- **Hosted Deployment Adapters**
+  - Managed `DATABASE_URL` support while preserving local Postgres settings
+  - Configurable production CORS origins
+  - Readiness endpoint
+  - Hosting-platform `PORT` support in the API container
+  - Free-tier split deployment runbook for Vercel, Render, Supabase and Upstash
 
 ## Architecture
 
@@ -196,9 +203,9 @@ The repository's CI pipeline currently validates:
 
 The project follows a root-cause-first workflow: features are not considered complete when only the UI works; the API, persistence, retrieval/generation path and tests must remain coherent.
 
-## Free deployment target
+## Hosted deployment
 
-The planned zero-cost portfolio/demo deployment separates the services instead of trying to run the local Docker Compose topology on one provider:
+The portfolio deployment target separates the application from managed infrastructure:
 
 ```text
                     ┌─────────────────┐
@@ -218,24 +225,22 @@ The planned zero-cost portfolio/demo deployment separates the services instead o
        │  Supabase   │ │   Upstash   │ │ LLM provider│
        │ PostgreSQL  │ │    Redis    │ │ / local mode│
        │ + pgvector  │ │ cache/queue │ │             │
-       └─────────────┘ └──────┬──────┘ └─────────────┘
-                              │
-                              ▼
-                       ┌─────────────┐
-                       │   Render    │
-                       │   Worker    │
-                       └─────────────┘
+       └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
-This is a **free-tier deployment target**, not an SLA-backed production environment. Free hosting can introduce cold starts, inactivity pauses, resource limits and other availability constraints.
+This is a **free-tier portfolio/demo target**, not an SLA-backed production environment. The exact hosting providers can impose cold starts, inactivity pauses, quotas and resource limits.
 
-The application itself does not require a paid LLM provider: deterministic/local providers remain available for zero-cost development and testing. External model APIs may introduce their own usage charges.
+See `infra/deployment/README.md` for the release sequence and environment contract.
 
-Deployment documentation lives in `infra/deployment/README.md`.
+### Deployment gate
+
+The hosted environment is not considered complete until this path is smoke-tested:
+
+`Vercel Web → Render API → Supabase pgvector → hybrid retrieval → generation → cited response`
 
 ## Security boundary
 
-Production deployments should use:
+Hosted deployments should use:
 
 - `AUTH_MODE=jwt`
 - strong secret management
@@ -245,7 +250,7 @@ Production deployments should use:
 - secrets supplied through the hosting platform rather than committed to Git
 - release-time database migrations
 - exported OpenTelemetry telemetry
-- separate API and worker processes
+- separate API and worker processes where the selected host supports them
 
 Local authentication is intentionally limited to development.
 
@@ -276,12 +281,14 @@ Planned evaluation expansion includes answer relevance, faithfulness, p50/p95 la
 - [x] Observability foundation
 - [x] Retrieval evaluation foundation
 - [x] Production containerization
-- [x] Durable Redis-backed worker foundation
+- [x] Managed database/Redis configuration adapters
+- [x] Deployment runbook
+- [ ] Live free-tier infrastructure deployment
+- [ ] Deployment smoke tests
 
 ### Next
-- [ ] Free-tier deployment
-- [ ] Production database/Redis configuration adapters
-- [ ] Deployment smoke tests
+- [ ] Live Vercel/Render/Supabase/Upstash deployment
+- [ ] End-to-end hosted smoke test
 - [ ] Real provider integrations behind the gateway
 - [ ] Expanded evaluation dataset and dashboard
 - [ ] GitHub/web/Notion ingestion

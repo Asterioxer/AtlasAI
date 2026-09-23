@@ -4,12 +4,30 @@ All notable AtlasAI development milestones are documented here.
 
 ## [Unreleased]
 
+### Added
+- Managed deployment adapters for `DATABASE_URL`, configurable CORS and hosting-platform ports.
+- `/ready` readiness endpoint.
+- Free-tier deployment runbook for Vercel, Render, Supabase and Upstash.
+
 ### Planned
-- Free-tier deployment using Vercel, Render, Supabase and Upstash.
-- Production deployment configuration for managed PostgreSQL/pgvector and Redis.
+- Live free-tier infrastructure deployment.
 - Deployment smoke tests and environment validation.
 - Expanded evaluation dataset and quality dashboard.
 - Additional ingestion connectors and advanced retrieval/model benchmarking.
+
+## 2026-09-23 — Hosted Deployment Adapters
+
+### Added
+- Managed PostgreSQL support through `DATABASE_URL`, while preserving the local Postgres configuration.
+- Configurable CORS origins for hosted frontend/API separation.
+- `/ready` readiness endpoint alongside the existing liveness endpoint.
+- API container support for hosting-provided `PORT`.
+- Environment template updates for production-oriented configuration.
+- Free-tier deployment runbook covering Vercel, Render, Supabase and Upstash.
+
+### Validation
+- Database migrations continue to use the existing `vector` extension path.
+- Hosted deployment remains gated on live infrastructure provisioning and an end-to-end smoke test.
 
 ## 2026-09-23 — Production Hardening
 
@@ -28,8 +46,8 @@ All notable AtlasAI development milestones are documented here.
 - CI validation for API and web container builds.
 
 ### Improved
-- Production configuration now explicitly separates development authentication from the production security boundary.
-- README now documents the production architecture and deployment expectations.
+- Production configuration explicitly separates development authentication from the production security boundary.
+- README documents the production architecture and deployment expectations.
 - Release workflow documents image build/scan, migrations, service startup and health verification.
 
 ### Validation
@@ -147,4 +165,5 @@ All notable AtlasAI development milestones are documented here.
 | Phase 3 — AI Product Layer | Complete |
 | Phase 4 — Production / AI Engineering Foundations | Complete |
 | Production Hardening | Complete |
-| Free-tier deployment | Next |
+| Hosted deployment adapters | Complete |
+| Live free-tier deployment | Next |
