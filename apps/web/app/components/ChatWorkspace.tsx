@@ -310,7 +310,7 @@ export default function ChatWorkspace() {
               {booting ? "Connecting to AtlasAI…" : workspace ? workspace.name : "Workspace unavailable"}
             </span>
           </div>
-          {currentConversation && <button className="secondary-btn" onClick={() => void newConversation}>New thread</button>}
+          {currentConversation && <button className="secondary-btn" onClick={() => void newConversation()}>New thread</button>}
         </div>
 
         {error && (
