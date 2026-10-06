@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { DragEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 type Workspace = { id: string; name: string };
 type Source = { id: string; name: string; source_type: string };
@@ -9,20 +9,33 @@ type Message = { id: string; role: string; content: string };
 type Citation = { chunk_id: string; source_id: string; document_id: string; score: number };
 
 const API =
-  process.env.NEXT_PUBLIC_API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ||
   (typeof window !== "undefined" && window.location.hostname !== "localhost"
     ? "https://atlasai-w5i8.onrender.com"
     : "http://localhost:8000");
-const TOKEN = process.env.NEXT_PUBLIC_ATLAS_TOKEN ?? "demo-user";
+const TOKEN = process.env.NEXT_PUBLIC_ATLAS_TOKEN || "demo-user";
 
 async function api(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${TOKEN}`);
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
-  const response = await fetch(`${API}${path}`, { ...init, headers });
+
+  let response: Response;
+  try {
+    response = await fetch(`${API}${path}`, { ...init, headers });
+  } catch {
+    throw new Error(`Cannot reach AtlasAI API at ${API}. Check the Render service and CORS configuration.`);
+  }
+
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail ?? "Request failed");
+  if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
   return data;
+}
+
+function conversationLabel(id: string, messages: Message[], fallbackIndex: number) {
+  const firstUser = messages.find((m) => m.role === "user");
+  if (firstUser?.content) return firstUser.content.slice(0, 34) + (firstUser.content.length > 34 ? "…" : "");
+  return `Conversation ${fallbackIndex + 1}`;
 }
 
 export default function ChatWorkspace() {
@@ -36,114 +49,356 @@ export default function ChatWorkspace() {
   const [citations, setCitations] = useState<Citation[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [booting, setBooting] = useState(true);
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
 
-  async function refresh(id: string) {
+  const currentConversation = useMemo(
+    () => conversations.find((c) => c.id === conversationId),
+    [conversations, conversationId]
+  );
+
+  async function selectConversation(id: string) {
+    setConversationId(id);
+    setAnswer("");
+    setCitations([]);
+    setError("");
+    try {
+      const rows = await api(`/api/v1/conversations/${id}/messages`);
+      setMessages(rows);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load conversation");
+    }
+  }
+
+  async function refresh(id: string, preferConversation = false) {
     const [sourceRows, conversationRows] = await Promise.all([
       api(`/api/v1/workspaces/${id}/sources`),
       api(`/api/v1/workspaces/${id}/conversations`),
     ]);
     setSources(sourceRows);
     setConversations(conversationRows);
-    if (!conversationId && conversationRows[0]) selectConversation(conversationRows[0].id);
+
+    if (preferConversation && conversationRows[0]) {
+      await selectConversation(conversationRows[0].id);
+    } else if (!conversationId && conversationRows[0]) {
+      await selectConversation(conversationRows[0].id);
+    }
+  }
+
+  async function initialize() {
+    setBooting(true);
+    setError("");
+    try {
+      const rows = await api("/api/v1/workspaces");
+      const current: Workspace =
+        rows[0] ??
+        (await api("/api/v1/workspaces", {
+          method: "POST",
+          body: JSON.stringify({ name: "AtlasAI Demo" }),
+        }));
+      setWorkspace(current);
+      await refresh(current.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to initialize workspace");
+    } finally {
+      setBooting(false);
+    }
   }
 
   useEffect(() => {
-    (async () => {
-      try {
-        const rows = await api("/api/v1/workspaces");
-        const current: Workspace = rows[0] ?? await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "AtlasAI Demo" }) });
-        setWorkspace(current);
-        await refresh(current.id);
-      } catch (e) { setError(e instanceof Error ? e.message : "Failed to initialize workspace"); }
-    })();
+    void initialize();
+    // The API/workspace should initialize once when the page mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function selectConversation(id: string) {
-    setConversationId(id);
-    try {
-      const rows = await api(`/api/v1/conversations/${id}/messages`);
-      setMessages(rows);
-    } catch (e) { setError(e instanceof Error ? e.message : "Failed to load conversation"); }
-  }
 
   async function newConversation() {
     if (!workspace) return;
-    const row = await api(`/api/v1/workspaces/${workspace.id}/conversations`, { method: "POST" });
-    setConversations((old) => [row, ...old]);
-    await selectConversation(row.id);
+    setError("");
+    try {
+      const row = await api(`/api/v1/workspaces/${workspace.id}/conversations`, { method: "POST" });
+      setConversations((old) => [row, ...old]);
+      await selectConversation(row.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create conversation");
+    }
+  }
+
+  function chooseFile(nextFile: File | null) {
+    if (!nextFile) return;
+    const allowed = ["application/pdf", "text/plain", "text/markdown"];
+    const extensionOk = /\.(pdf|txt|md|markdown)$/i.test(nextFile.name);
+    if (!extensionOk && !allowed.includes(nextFile.type)) {
+      setError("Use a PDF, Markdown, or TXT document.");
+      return;
+    }
+    setError("");
+    setFile(nextFile);
+  }
+
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragging(false);
+    chooseFile(event.dataTransfer.files?.[0] ?? null);
   }
 
   async function upload() {
     if (!workspace || !file) return;
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
       let source = sources[0];
       if (!source) {
         source = await api(`/api/v1/workspaces/${workspace.id}/sources`, {
-          method: "POST", body: JSON.stringify({ name: "Uploaded documents", source_type: "file" }),
+          method: "POST",
+          body: JSON.stringify({ name: "Uploaded documents", source_type: "file" }),
         });
       }
+
       const form = new FormData();
       form.append("file", file);
-      await api(`/api/v1/sources/${source.id}/upload`, { method: "POST", body: form });
+      const result = await api(`/api/v1/sources/${source.id}/upload`, {
+        method: "POST",
+        body: form,
+      });
+
       setFile(null);
       await refresh(workspace.id);
-    } catch (e) { setError(e instanceof Error ? e.message : "Upload failed"); }
-    finally { setLoading(false); }
+      setError(`Uploaded “${result.title}” — ${result.chunks_created} chunks indexed.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function ask(event: FormEvent) {
     event.preventDefault();
-    if (!workspace || !question.trim()) return;
-    setLoading(true); setError(""); setAnswer(""); setCitations([]);
+    if (!workspace || !question.trim() || loading) return;
+
+    const submittedQuestion = question.trim();
+    setLoading(true);
+    setError("");
+    setAnswer("");
+    setCitations([]);
+
     try {
       const data = await api(`/api/v1/workspaces/${workspace.id}/chat`, {
         method: "POST",
-        body: JSON.stringify({ question, conversation_id: conversationId }),
+        body: JSON.stringify({
+          question: submittedQuestion,
+          conversation_id: conversationId,
+        }),
       });
+
       setConversationId(data.conversation_id);
       setAnswer(data.answer);
-      setCitations(data.citations ?? []);
+      setCitations(data.citations || []);
       setMessages((old) => [
         ...old,
-        { id: crypto.randomUUID(), role: "user", content: question },
+        { id: crypto.randomUUID(), role: "user", content: submittedQuestion },
         { id: crypto.randomUUID(), role: "assistant", content: data.answer },
       ]);
+
       if (!conversations.some((c) => c.id === data.conversation_id)) {
-        setConversations((old) => [{ id: data.conversation_id, workspace_id: workspace.id }, ...old]);
+        setConversations((old) => [
+          { id: data.conversation_id, workspace_id: workspace.id },
+          ...old,
+        ]);
       }
       setQuestion("");
-    } catch (e) { setError(e instanceof Error ? e.message : "Request failed"); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[240px_1fr_300px]">
-      <aside className="rounded-xl border p-4">
-        <div className="flex items-center justify-between"><h2 className="font-semibold">Conversations</h2><button onClick={newConversation} className="rounded border px-2 py-1 text-sm">+</button></div>
-        <div className="mt-3 space-y-2">
-          {conversations.map((c) => <button key={c.id} onClick={() => selectConversation(c.id)} className={`block w-full truncate rounded-lg border p-2 text-left text-sm ${conversationId === c.id ? "bg-zinc-100" : ""}`}>{c.id.slice(0, 8)}</button>)}
+    <div className="workspace-grid">
+      <aside className="panel sidebar">
+        <div className="panel-title">
+          <div>
+            <h2>Conversations</h2>
+            <p className="panel-kicker">Your research threads</p>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={newConversation}
+            disabled={!workspace || loading}
+            aria-label="New conversation"
+            title="New conversation"
+          >
+            +
+          </button>
         </div>
-        <div className="mt-6 border-t pt-4">
-          <h2 className="font-semibold">Knowledge base</h2>
-          <input type="file" accept=".txt,.md,.markdown,.pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-3 w-full text-sm" />
-          <button onClick={upload} disabled={!file || loading} className="mt-2 w-full rounded-lg border px-3 py-2 text-sm">{loading ? "Working..." : "Upload document"}</button>
-          <p className="mt-2 text-xs text-zinc-500">{sources.length} source(s) connected.</p>
+
+        <div className="conversation-list">
+          {conversations.length === 0 ? (
+            <div className="empty-state">No conversations yet. Start a new thread.</div>
+          ) : (
+            conversations.map((conversation, index) => (
+              <button
+                type="button"
+                key={conversation.id}
+                onClick={() => void selectConversation(conversation.id)}
+                className={`conversation ${conversationId === conversation.id ? "active" : ""}`}
+              >
+                <span className="conversation-name">
+                  {conversation.id === conversationId
+                    ? conversationLabel(conversation.id, messages, index)
+                    : `Conversation ${index + 1}`}
+                </span>
+                <span className="conversation-id">{conversation.id.slice(0, 8)} · synced</span>
+              </button>
+            ))
+          )}
         </div>
+
+        <div className="divider" />
+
+        <div className="panel-title">
+          <div>
+            <h2>Knowledge base</h2>
+            <p className="panel-kicker">Ground answers in your files</p>
+          </div>
+        </div>
+
+        <div
+          className={`upload-zone ${dragging ? "dragging" : ""}`}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+        >
+          <input
+            className="file-input"
+            type="file"
+            accept=".txt,.md,.markdown,.pdf"
+            onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
+            disabled={loading}
+          />
+          <p className="panel-kicker">{dragging ? "Drop it here" : "Drag & drop or choose a document"}</p>
+          {file && <div className="file-name" title={file.name}>{file.name}</div>}
+          <div className="upload-actions">
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={() => void upload()}
+              disabled={!file || loading || !workspace}
+            >
+              {loading ? "Indexing…" : "Upload & index"}
+            </button>
+            {file && (
+              <button type="button" className="secondary-btn" onClick={() => setFile(null)} disabled={loading}>
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+        <p className="source-count">{sources.length} connected source{sources.length === 1 ? "" : "s"}</p>
       </aside>
-      <section>
-        <form onSubmit={ask} className="flex gap-3">
-          <input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask your knowledge base..." className="min-w-0 flex-1 rounded-xl border px-4 py-3" />
-          <button disabled={loading || !workspace} className="rounded-xl border px-5 py-3 font-medium">{loading ? "..." : "Ask"}</button>
+
+      <section className="panel main-panel">
+        <div className="chat-topbar">
+          <div>
+            <h2 className="chat-heading">{currentConversation ? "Knowledge chat" : "New knowledge chat"}</h2>
+            <span className="chat-meta">
+              {booting ? "Connecting to AtlasAI…" : workspace ? workspace.name : "Workspace unavailable"}
+            </span>
+          </div>
+          {currentConversation && <button className="secondary-btn" onClick={() => void newConversation}>New thread</button>}
+        </div>
+
+        {error && (
+          <div className={error.startsWith("Uploaded") ? "info-banner" : "error-banner"}>
+            {error}
+            {!error.startsWith("Uploaded") && (
+              <button
+                type="button"
+                className="secondary-btn"
+                style={{ marginLeft: 8, padding: "4px 8px" }}
+                onClick={() => void initialize()}
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="messages">
+          {messages.length === 0 ? (
+            <div className="welcome-card">
+              <div className="welcome-icon">✦</div>
+              <h3>Ask AtlasAI anything in your knowledge base.</h3>
+              <p>
+                Upload a document on the left, then ask a precise question. AtlasAI will retrieve
+                relevant evidence and show the sources behind its answer.
+              </p>
+            </div>
+          ) : (
+            messages.slice(-10).map((message) => (
+              <div key={message.id} className={`message ${message.role === "user" ? "user" : ""}`}>
+                <div className="avatar">{message.role === "user" ? "Y" : "A"}</div>
+                <div className="bubble">{message.content}</div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <form onSubmit={ask} className="composer">
+          <input
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            placeholder={workspace ? "Ask about your indexed knowledge…" : "Connecting to workspace…"}
+            className="composer-input"
+            disabled={loading || !workspace}
+          />
+          <button
+            type="submit"
+            disabled={loading || !workspace || !question.trim()}
+            className="primary-btn send-btn"
+          >
+            {loading ? "Thinking…" : "Ask"}
+          </button>
         </form>
-        {error && <p className="mt-4 rounded-lg border p-3 text-sm">{error}</p>}
-        {messages.length > 0 && <div className="mt-6 space-y-3">{messages.slice(-8).map((m) => <div key={m.id} className="rounded-xl border p-4"><div className="text-xs font-semibold uppercase text-zinc-500">{m.role}</div><p className="mt-2 whitespace-pre-wrap">{m.content}</p></div>)}</div>}
-        {answer && <article className="mt-6 rounded-xl border p-6"><h2 className="font-semibold">Latest grounded answer</h2><p className="mt-3 whitespace-pre-wrap leading-7">{answer}</p></article>}
       </section>
-      <aside className="rounded-xl border p-5">
-        <h2 className="font-semibold">Evidence</h2>
-        {citations.length ? <ul className="mt-3 space-y-2">{citations.map((c) => <li key={c.chunk_id} className="rounded-lg border p-3 text-sm"><b>{c.chunk_id.slice(0, 8)}</b><div className="text-zinc-500">score {c.score.toFixed(3)}</div></li>)}</ul> : <p className="mt-3 text-sm text-zinc-500">Ask a question to inspect retrieved evidence.</p>}
+
+      <aside className="panel evidence-panel">
+        <div className="evidence-header">
+          <div>
+            <h2 className="panel-title" style={{ margin: 0 }}>Evidence</h2>
+            <p className="panel-kicker">Retrieved grounding signals</p>
+          </div>
+          <span className="status-pill">{citations.length} citation{citations.length === 1 ? "" : "s"}</span>
+        </div>
+
+        {answer && (
+          <div className="answer-card">
+            <h3>Latest grounded answer</h3>
+            <p>{answer}</p>
+          </div>
+        )}
+
+        {citations.length ? (
+          <div className="evidence-list">
+            {citations.map((citation, index) => (
+              <div key={citation.chunk_id} className="citation-card">
+                <div className="citation-top">
+                  <span className="citation-label">SOURCE {index + 1}</span>
+                  <span className="score">{citation.score.toFixed(3)} match</span>
+                </div>
+                <div className="citation-id">chunk {citation.chunk_id.slice(0, 12)}…</div>
+                <div className="citation-id">document {citation.document_id.slice(0, 12)}…</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">Ask a question to inspect retrieved evidence and citation scores.</div>
+        )}
       </aside>
     </div>
   );
