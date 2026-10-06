@@ -15,10 +15,22 @@ async def generate_grounded_answer(
     hits: list[RetrievalHit],
     provider: LLMProvider,
 ) -> GroundedAnswer:
-    context = "\n".join(
-        f"[{index + 1}] chunk={hit.chunk_id} source={hit.source_id}"
-        for index, hit in enumerate(hits)
+    evidence_blocks = []
+    for index, hit in enumerate(hits, start=1):
+        evidence_blocks.append(
+            f"[{index}]\n"
+            f"source_id: {hit.source_id}\n"
+            f"document_id: {hit.document_id}\n"
+            f"relevance: {hit.score:.4f}\n"
+            f"content:\n{hit.content[:7000]}"
+        )
+
+    context = "\n\n---\n\n".join(evidence_blocks)
+    prompt = (
+        f"Question:\n{question}\n\n"
+        f"Retrieved evidence:\n{context or '(No relevant evidence found.)'}\n\n"
+        "Produce a grounded answer. If the evidence does not answer the question, "
+        "say that the knowledge base does not contain enough information."
     )
-    prompt = f"Question: {question}\nContext:\n{context}"
     response = await provider.generate(prompt)
     return GroundedAnswer(response=response, citations=hits)
