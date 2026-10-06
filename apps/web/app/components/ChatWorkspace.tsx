@@ -8,7 +8,11 @@ type Conversation = { id: string; workspace_id: string };
 type Message = { id: string; role: string; content: string };
 type Citation = { chunk_id: string; source_id: string; document_id: string; score: number };
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? "https://atlasai-w5i8.onrender.com"
+    : "http://localhost:8000");
 const TOKEN = process.env.NEXT_PUBLIC_ATLAS_TOKEN ?? "demo-user";
 
 async function api(path: string, init: RequestInit = {}) {
