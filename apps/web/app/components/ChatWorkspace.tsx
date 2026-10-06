@@ -20,25 +20,25 @@ const SUPPORTED_EXTENSIONS =
 
 async function api(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
-  headers.set("Authorization", \`Bearer \${TOKEN}\`);
+  headers.set("Authorization", `Bearer ${TOKEN}`);
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
 
   let response: Response;
   try {
-    response = await fetch(\`\${API}\${path}\`, { ...init, headers });
+    response = await fetch(`${API}${path}`, { ...init, headers });
   } catch {
-    throw new Error(\`Cannot reach AtlasAI API at \${API}. Check the Render service and CORS configuration.\`);
+    throw new Error(`Cannot reach AtlasAI API at ${API}. Check the Render service and CORS configuration.`);
   }
 
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail || \`Request failed (\${response.status})\`);
+  if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
   return data;
 }
 
 function conversationLabel(id: string, messages: Message[], fallbackIndex: number) {
   const firstUser = messages.find((m) => m.role === "user");
   if (firstUser?.content) return firstUser.content.slice(0, 34) + (firstUser.content.length > 34 ? "…" : "");
-  return \`Conversation \${fallbackIndex + 1}\`;
+  return `Conversation ${fallbackIndex + 1}`;
 }
 
 export default function ChatWorkspace() {
@@ -67,7 +67,7 @@ export default function ChatWorkspace() {
     setCitations([]);
     setError("");
     try {
-      const rows = await api(\`/api/v1/conversations/\${id}/messages\`);
+      const rows = await api(`/api/v1/conversations/${id}/messages`);
       setMessages(rows);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load conversation");
@@ -76,8 +76,8 @@ export default function ChatWorkspace() {
 
   async function refresh(id: string, preferConversation = false) {
     const [sourceRows, conversationRows] = await Promise.all([
-      api(\`/api/v1/workspaces/\${id}/sources\`),
-      api(\`/api/v1/workspaces/\${id}/conversations\`),
+      api(`/api/v1/workspaces/${id}/sources`),
+      api(`/api/v1/workspaces/${id}/conversations`),
     ]);
     setSources(sourceRows);
     setConversations(conversationRows);
@@ -118,7 +118,7 @@ export default function ChatWorkspace() {
     if (!workspace) return;
     setError("");
     try {
-      const row = await api(\`/api/v1/workspaces/\${workspace.id}/conversations\`, { method: "POST" });
+      const row = await api(`/api/v1/workspaces/${workspace.id}/conversations`, { method: "POST" });
       setConversations((old) => [row, ...old]);
       await selectConversation(row.id);
     } catch (e) {
@@ -128,7 +128,7 @@ export default function ChatWorkspace() {
 
   function chooseFile(nextFile: File | null) {
     if (!nextFile) return;
-    const extensionOk = new RegExp(\`(\\\\.)(pdf|txt|md|markdown|rst|log|csv|tsv|json|yaml|yml|toml|ini|cfg|conf|xml|html|htm|css|js|jsx|ts|tsx|py|java|kt|go|rs|c|h|cpp|hpp|cs|php|rb|swift|scala|sql|sh|bash|zsh|ps1|bat|tex|dockerfile|rtf|eml|docx|xlsx|xls|pptx|odt|ods|odp|epub)$\`, "i").test(nextFile.name);
+    const extensionOk = new RegExp(`(\\\\.)(pdf|txt|md|markdown|rst|log|csv|tsv|json|yaml|yml|toml|ini|cfg|conf|xml|html|htm|css|js|jsx|ts|tsx|py|java|kt|go|rs|c|h|cpp|hpp|cs|php|rb|swift|scala|sql|sh|bash|zsh|ps1|bat|tex|dockerfile|rtf|eml|docx|xlsx|xls|pptx|odt|ods|odp|epub)$`, "i").test(nextFile.name);
     if (!extensionOk) {
       setError("Unsupported file type. AtlasAI accepts PDF, Office, spreadsheets, presentations, structured data, email, markup, source code, and ebook formats.");
       return;
@@ -150,7 +150,7 @@ export default function ChatWorkspace() {
     try {
       let source = sources[0];
       if (!source) {
-        source = await api(\`/api/v1/workspaces/\${workspace.id}/sources\`, {
+        source = await api(`/api/v1/workspaces/${workspace.id}/sources`, {
           method: "POST",
           body: JSON.stringify({ name: "Uploaded documents", source_type: "file" }),
         });
@@ -158,14 +158,14 @@ export default function ChatWorkspace() {
 
       const form = new FormData();
       form.append("file", file);
-      const result = await api(\`/api/v1/sources/\${source.id}/upload\`, {
+      const result = await api(`/api/v1/sources/${source.id}/upload`, {
         method: "POST",
         body: form,
       });
 
       setFile(null);
       await refresh(workspace.id);
-      setError(\`Uploaded “\${result.title}” — \${result.chunks_created} chunks indexed.\`);
+      setError(`Uploaded “${result.title}” — ${result.chunks_created} chunks indexed.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -184,7 +184,7 @@ export default function ChatWorkspace() {
     setCitations([]);
 
     try {
-      const data = await api(\`/api/v1/workspaces/\${workspace.id}/chat\`, {
+      const data = await api(`/api/v1/workspaces/${workspace.id}/chat`, {
         method: "POST",
         body: JSON.stringify({
           question: submittedQuestion,
@@ -231,9 +231,9 @@ export default function ChatWorkspace() {
             <div className="empty-state">No conversations yet. Start a new thread.</div>
           ) : (
             conversations.map((conversation, index) => (
-              <button type="button" key={conversation.id} onClick={() => void selectConversation(conversation.id)} className={\`conversation \${conversationId === conversation.id ? "active" : ""}\`}>
+              <button type="button" key={conversation.id} onClick={() => void selectConversation(conversation.id)} className={`conversation ${conversationId === conversation.id ? "active" : ""}`}>
                 <span className="conversation-name">
-                  {conversation.id === conversationId ? conversationLabel(conversation.id, messages, index) : \`Conversation \${index + 1}\`}
+                  {conversation.id === conversationId ? conversationLabel(conversation.id, messages, index) : `Conversation ${index + 1}`}
                 </span>
                 <span className="conversation-id">{conversation.id.slice(0, 8)} · synced</span>
               </button>
@@ -250,7 +250,7 @@ export default function ChatWorkspace() {
           </div>
         </div>
 
-        <div className={\`upload-zone \${dragging ? "dragging" : ""}\`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
+        <div className={`upload-zone ${dragging ? "dragging" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
           <input className="file-input" type="file" accept={SUPPORTED_EXTENSIONS} onChange={(event) => chooseFile(event.target.files?.[0] ?? null)} disabled={loading} />
           <p className="panel-kicker">{dragging ? "Drop it here" : "Drag & drop or choose a document"}</p>
           {file && <div className="file-name" title={file.name}>{file.name}</div>}
@@ -290,7 +290,7 @@ export default function ChatWorkspace() {
             </div>
           ) : (
             messages.slice(-10).map((message) => (
-              <div key={message.id} className={\`message \${message.role === "user" ? "user" : ""}\`}>
+              <div key={message.id} className={`message ${message.role === "user" ? "user" : ""}`}>
                 <div className="avatar">{message.role === "user" ? "Y" : "A"}</div>
                 <div className="bubble">{message.content}</div>
               </div>
