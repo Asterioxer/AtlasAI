@@ -5,18 +5,25 @@ from sqlalchemy.orm import Session
 
 from .auth import AuthContext, require_auth, require_workspace_access
 from .chat_schemas import ChatRequest, ChatResponse
+from .config import settings
 from .conversation_models import Conversation, Message
 from .db import get_db
 from .models import Workspace
 from .services.chat import generate_grounded_answer
 from .services.database_retrieval import lexical_search, vector_search
 from .services.embeddings import DeterministicEmbeddingProvider
-from .services.llm import DeterministicLLMProvider
+from .services.llm import build_llm_provider
 from .services.retrieval import reciprocal_rank_fusion
 from .services.reranking import Reranker
 
 router = APIRouter(prefix="/api/v1")
-provider = DeterministicLLMProvider()
+provider = build_llm_provider(
+    settings.llm_provider,
+    token=settings.hf_token,
+    model=settings.llm_model,
+    endpoint=settings.llm_endpoint,
+    timeout=settings.llm_timeout_seconds,
+)
 embedding_provider = DeterministicEmbeddingProvider()
 reranker = Reranker()
 
@@ -54,7 +61,12 @@ async def chat(
         answer=result.response.text,
         model=result.response.model,
         citations=[
-            {"chunk_id": hit.chunk_id, "source_id": hit.source_id, "document_id": hit.document_id, "score": hit.score}
+            {
+                "chunk_id": hit.chunk_id,
+                "source_id": hit.source_id,
+                "document_id": hit.document_id,
+                "score": hit.score,
+            }
             for hit in result.citations
         ],
     )
