@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     jwt_issuer: str = ""
     jwt_audience: str = ""
     cors_origins: str = ""
+
+    llm_provider: str = "deterministic"
+    llm_model: str = "Qwen/Qwen3-4B-Instruct-2507:cheapest"
+    llm_endpoint: str = "https://router.huggingface.co/v1/chat/completions"
+    hf_token: str = ""
+    llm_timeout_seconds: float = 90.0
+    max_upload_bytes: int = 25 * 1024 * 1024
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
