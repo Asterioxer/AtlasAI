@@ -8,7 +8,7 @@ from .retrieval import RetrievalHit
 def lexical_search(db: Session, workspace_id: str, query: str, limit: int = 8) -> list[RetrievalHit]:
     rows = db.execute(
         text("""
-            SELECT c.id AS chunk_id, s.id AS source_id, d.id AS document_id,
+            SELECT c.id AS chunk_id, c.content AS content, s.id AS source_id, d.id AS document_id,
                    ts_rank_cd(to_tsvector('english', c.content), plainto_tsquery('english', :query)) AS score
             FROM chunks c
             JOIN documents d ON d.id = c.document_id
@@ -20,7 +20,10 @@ def lexical_search(db: Session, workspace_id: str, query: str, limit: int = 8) -
         """),
         {"workspace_id": workspace_id, "query": query, "limit": limit},
     )
-    return [RetrievalHit(str(r.chunk_id), float(r.score), str(r.source_id), str(r.document_id)) for r in rows]
+    return [
+        RetrievalHit(str(r.chunk_id), float(r.score), str(r.source_id), str(r.document_id), str(r.content))
+        for r in rows
+    ]
 
 
 async def vector_search(
@@ -30,7 +33,7 @@ async def vector_search(
     vector = "[" + ",".join(str(float(v)) for v in embedding) + "]"
     rows = db.execute(
         text("""
-            SELECT c.id AS chunk_id, s.id AS source_id, d.id AS document_id,
+            SELECT c.id AS chunk_id, c.content AS content, s.id AS source_id, d.id AS document_id,
                    1 - (c.embedding <=> CAST(:embedding AS vector)) AS score
             FROM chunks c
             JOIN documents d ON d.id = c.document_id
@@ -42,4 +45,7 @@ async def vector_search(
         """),
         {"workspace_id": workspace_id, "embedding": vector, "limit": limit},
     )
-    return [RetrievalHit(str(r.chunk_id), float(r.score), str(r.source_id), str(r.document_id)) for r in rows]
+    return [
+        RetrievalHit(str(r.chunk_id), float(r.score), str(r.source_id), str(r.document_id), str(r.content))
+        for r in rows
+    ]
