@@ -2,11 +2,21 @@ import ChatWorkspace from "./components/ChatWorkspace";
 
 export default function Home() {
   return (
-    <main className="mx-auto min-h-screen max-w-6xl p-8">
-      <header className="mb-8">
-        <p className="text-sm font-semibold tracking-wide">ATLASAI</p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight">Enterprise knowledge, grounded.</h1>
-        <p className="mt-3 max-w-2xl text-zinc-600">Search your knowledge base, ask questions, and inspect the evidence behind responses.</p>
+    <main className="atlas-shell">
+      <header className="atlas-header">
+        <div>
+          <div className="brand-row">
+            <div className="brand-mark">A</div>
+            <div>
+              <p className="eyebrow">ATLASAI</p>
+              <h1 className="atlas-title">Enterprise knowledge, grounded.</h1>
+            </div>
+          </div>
+          <p className="atlas-subtitle">
+            Search your knowledge base, ask questions, and inspect the evidence behind every response.
+          </p>
+        </div>
+        <div className="status-pill"><span className="status-dot online" /> Local workspace</div>
       </header>
       <ChatWorkspace />
     </main>
