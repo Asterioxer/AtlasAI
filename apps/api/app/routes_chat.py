@@ -11,7 +11,7 @@ from .db import get_db
 from .models import Workspace
 from .services.chat import generate_grounded_answer
 from .services.database_retrieval import lexical_search, vector_search
-from .services.embeddings import DeterministicEmbeddingProvider
+from .services.embeddings import build_embedding_provider
 from .services.llm import build_llm_provider
 from .services.retrieval import reciprocal_rank_fusion
 from .services.reranking import Reranker
@@ -24,7 +24,15 @@ provider = build_llm_provider(
     endpoint=settings.llm_endpoint,
     timeout=settings.llm_timeout_seconds,
 )
-embedding_provider = DeterministicEmbeddingProvider()
+embedding_provider = build_embedding_provider(
+    settings.embedding_provider,
+    token=settings.hf_token,
+    model=settings.embedding_model,
+    dimensions=settings.embedding_dimensions,
+    endpoint=settings.embedding_endpoint,
+    timeout=settings.embedding_timeout_seconds,
+    batch_size=settings.embedding_batch_size,
+)
 reranker = Reranker()
 
 
@@ -47,18 +55,14 @@ async def chat(
         db.add(conversation)
         db.flush()
 
-    # Lexical retrieval is the source of truth until real semantic embeddings
-    # are configured. The previous synthetic 8-D vectors were useful as a
-    # placeholder but could rank unrelated chunks above exact matches.
-    lexical = lexical_search(db, str(workspace_id), payload.question, limit=12)
+    lexical = lexical_search(db, str(workspace_id), payload.question, limit=16)
 
-    if lexical:
-        dense = await vector_search(db, str(workspace_id), payload.question, embedding_provider, limit=12)
-        lexical_ids = {hit.chunk_id for hit in lexical}
-        dense_overlap = [hit for hit in dense if hit.chunk_id in lexical_ids]
-        candidates = reciprocal_rank_fusion(lexical, dense_overlap)
+    if embedding_provider.is_semantic:
+        dense = await vector_search(db, str(workspace_id), payload.question, embedding_provider, limit=16)
+        candidates = reciprocal_rank_fusion(lexical, dense)
     else:
-        candidates = []
+        # Synthetic vectors are intentionally excluded from retrieval.
+        candidates = lexical
 
     hits = reranker.rerank(payload.question, candidates, 5)
     result = await generate_grounded_answer(payload.question, hits, provider)
