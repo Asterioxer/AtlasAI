@@ -56,10 +56,7 @@ async def chat(
     if conversation is not None and conversation.workspace_id != workspace_id:
         raise HTTPException(400, "Conversation does not belong to workspace")
     if conversation is None:
-        conversation = Conversation(
-            workspace_id=workspace_id,
-            title=_conversation_title(payload.question),
-        )
+        conversation = Conversation(workspace_id=workspace_id, title=_conversation_title(payload.question))
         db.add(conversation)
         db.flush()
     elif not conversation.title:
@@ -85,12 +82,7 @@ async def chat(
         answer=result.response.text,
         model=result.response.model,
         citations=[
-            {
-                "chunk_id": hit.chunk_id,
-                "source_id": hit.source_id,
-                "document_id": hit.document_id,
-                "score": hit.score,
-            }
+            {"chunk_id": hit.chunk_id, "source_id": hit.source_id, "document_id": hit.document_id, "score": hit.score}
             for hit in result.citations
         ],
     )
