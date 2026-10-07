@@ -29,8 +29,11 @@ async def generate_grounded_answer(
     prompt = (
         f"Question:\n{question}\n\n"
         f"Retrieved evidence:\n{context or '(No relevant evidence found.)'}\n\n"
-        "Produce a grounded answer. If the evidence does not answer the question, "
-        "say that the knowledge base does not contain enough information."
+        "Answer the question directly using only the retrieved evidence. "
+        "Do not repeat the question, retrieval metadata, source IDs, or evidence blocks. "
+        "Do not invent facts. Use [1], [2], etc. only when a claim is supported by "
+        "the corresponding evidence. If the evidence does not answer the question, "
+        "say exactly that the knowledge base does not contain enough information."
     )
     response = await provider.generate(prompt)
     return GroundedAnswer(response=response, citations=hits)
