@@ -49,4 +49,8 @@ class Chunk(Base):
     document_id: Mapped[object] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     chunk_index: Mapped[int] = mapped_column(nullable=False)
+
+    # Legacy deterministic vector kept for backwards compatibility during the
+    # semantic migration. New semantic retrieval uses semantic_embedding.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(8), nullable=True)
+    semantic_embedding: Mapped[list[float] | None] = mapped_column(Vector(384), nullable=True)
