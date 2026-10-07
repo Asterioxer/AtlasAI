@@ -23,9 +23,11 @@ def _terms(text: str) -> list[str]:
 class Reranker:
     semantic_threshold: float = 0.42
 
-    def rerank(self, query: str, hits: list[RetrievalHit], top_k: int = 5) -> list[RetrievalHit]:
+    def rerank(
+        self, query: str, hits: list[RetrievalHit], top_k: int = 5
+    ) -> list[RetrievalHit]:
         query_terms = list(dict.fromkeys(_terms(query)))
-        if not query_terms:
+        if not query_terms or top_k <= 0:
             return []
 
         phrase = " ".join(query_terms)
@@ -38,26 +40,39 @@ class Reranker:
             coverage = matched / len(query_terms)
 
             phrase_bonus = 0.35 if phrase and phrase in content else 0.0
-            exact_bonus = 0.0
-            for term in query_terms:
-                if re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", content):
-                    exact_bonus += 0.08
+            exact_bonus = sum(
+                0.08
+                for term in query_terms
+                if re.search(
+                    rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])",
+                    content,
+                )
+            )
 
-            lexical_score = (coverage * 0.72) + phrase_bonus + min(exact_bonus, 0.24)
+            exact_bonus = min(exact_bonus, 0.24)
             semantic_score = max(0.0, min(hit.semantic_score, 1.0))
 
             if hit.semantic_score > 0.0:
-                # Real semantic hits may not contain the literal query terms.
-                # They are retained when the encoder reports meaningful
-                # similarity, while lexical overlap still gets a bonus.
+                # Semantic retrieval already encodes meaning. Do not discard a
+                # strong semantic candidate just because lexical token overlap
+                # is absent; lexical features only refine the ordering.
                 if semantic_score < self.semantic_threshold and matched == 0:
                     continue
-                score = (semantic_score * 0.72) + (coverage * 0.22) + phrase_bonus + min(exact_bonus, 0.24)
+                score = (
+                    (semantic_score * 0.78)
+                    + (coverage * 0.16)
+                    + phrase_bonus
+                    + exact_bonus
+                )
             else:
-                # Deterministic vectors are not semantic evidence.
                 if matched == 0:
                     continue
-                score = lexical_score + min(max(hit.score, 0.0), 1.0) * 0.04
+                score = (
+                    (coverage * 0.76)
+                    + phrase_bonus
+                    + exact_bonus
+                    + min(max(hit.score, 0.0), 1.0) * 0.04
+                )
 
             scored.append((score, hit))
 
