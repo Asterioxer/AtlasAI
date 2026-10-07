@@ -63,7 +63,7 @@ async def upload_document(
                     document_id=document.id,
                     content=item.content,
                     chunk_index=item.index,
-                    embedding=None if embedding_provider.is_semantic else embedding,
+                    embedding=None,
                     semantic_embedding=embedding if embedding_provider.is_semantic else None,
                 )
             )
