@@ -7,20 +7,36 @@ from sqlalchemy.orm import Session
 
 from .auth import AuthContext, require_auth, require_workspace_access
 from .chat_schemas import ChatRequest
+from .config import settings
 from .conversation_models import Conversation, Message
 from .db import get_db
 from .models import Workspace
 from .services.chat import generate_grounded_answer
 from .services.database_retrieval import lexical_search, vector_search
-from .services.embeddings import DeterministicEmbeddingProvider
-from .services.llm import DeterministicLLMProvider
+from .services.embeddings import build_embedding_provider
+from .services.llm import build_llm_provider
 from .services.retrieval import reciprocal_rank_fusion
 from .services.reranking import Reranker
 from .services.streaming import stream_text
 
 router = APIRouter(prefix="/api/v1")
-provider = DeterministicLLMProvider()
-embedding_provider = DeterministicEmbeddingProvider()
+
+provider = build_llm_provider(
+    settings.llm_provider,
+    token=settings.hf_token,
+    model=settings.llm_model,
+    endpoint=settings.llm_endpoint,
+    timeout=settings.llm_timeout_seconds,
+)
+embedding_provider = build_embedding_provider(
+    settings.embedding_provider,
+    token=settings.hf_token,
+    model=settings.embedding_model,
+    dimensions=settings.embedding_dimensions,
+    endpoint=settings.embedding_endpoint,
+    timeout=settings.embedding_timeout_seconds,
+    batch_size=settings.embedding_batch_size,
+)
 reranker = Reranker()
 
 
@@ -35,17 +51,44 @@ async def chat_stream(
         raise HTTPException(404, "Workspace not found")
     require_workspace_access(workspace_id, auth, db)
 
-    conversation = db.get(Conversation, payload.conversation_id) if payload.conversation_id else None
+    conversation = (
+        db.get(Conversation, payload.conversation_id)
+        if payload.conversation_id
+        else None
+    )
     if conversation is not None and conversation.workspace_id != workspace_id:
         raise HTTPException(400, "Conversation does not belong to workspace")
     if conversation is None:
-        conversation = Conversation(workspace_id=workspace_id)
+        normalized_title = " ".join(payload.question.split())[:117]
+        if len(" ".join(payload.question.split())) > 120:
+            normalized_title += "…"
+        conversation = Conversation(
+            workspace_id=workspace_id,
+            title=normalized_title,
+        )
         db.add(conversation)
         db.flush()
+    elif not conversation.title:
+        normalized_title = " ".join(payload.question.split())[:117]
+        if len(" ".join(payload.question.split())) > 120:
+            normalized_title += "…"
+        conversation.title = normalized_title
 
-    lexical = lexical_search(db, str(workspace_id), payload.question)
-    dense = await vector_search(db, str(workspace_id), payload.question, embedding_provider)
-    hits = reranker.rerank(payload.question, reciprocal_rank_fusion(dense, lexical), 5)
+    lexical = lexical_search(db, str(workspace_id), payload.question, limit=16)
+
+    if embedding_provider.is_semantic:
+        dense = await vector_search(
+            db,
+            str(workspace_id),
+            payload.question,
+            embedding_provider,
+            limit=16,
+        )
+        candidates = reciprocal_rank_fusion(lexical, dense)
+    else:
+        candidates = lexical
+
+    hits = reranker.rerank(payload.question, candidates, 5)
     result = await generate_grounded_answer(payload.question, hits, provider)
 
     db.add(Message(conversation_id=conversation.id, role="user", content=payload.question))
@@ -53,7 +96,12 @@ async def chat_stream(
     db.commit()
 
     citations = [
-        {"chunk_id": c.chunk_id, "source_id": c.source_id, "document_id": c.document_id, "score": c.score}
+        {
+            "chunk_id": c.chunk_id,
+            "source_id": c.source_id,
+            "document_id": c.document_id,
+            "score": c.score,
+        }
         for c in result.citations
     ]
 
