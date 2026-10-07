@@ -42,11 +42,12 @@ The generation layer is no longer a placeholder: the API can route grounded prom
   - parser-specific error handling
 
 - **RAG**
-  - deterministic embeddings for zero-cost retrieval
-  - PostgreSQL lexical search
-  - pgvector dense search
-  - Reciprocal Rank Fusion
-  - deterministic reranking
+  - PostgreSQL lexical retrieval
+  - optional hosted semantic embeddings through Hugging Face Inference Providers
+  - 384-D pgvector semantic index with HNSW
+  - Reciprocal Rank Fusion when semantic retrieval is enabled
+  - confidence-aware reranking
+  - additive semantic re-indexing for existing chunks
   - retrieved chunk text is passed to the model, not merely document IDs
   - citation-preserving grounded responses
 
@@ -70,6 +71,21 @@ Optional:
 \`LLM_MODEL=Qwen/Qwen3-4B-Instruct-2507:cheapest\`
 
 The Hugging Face token must remain a server-side Render secret; never put it in the Next.js frontend or Git repository.
+
+### Semantic retrieval configuration
+
+AtlasAI keeps generation and retrieval as separate provider boundaries. To activate semantic retrieval on the hosted API:
+
+`EMBEDDING_PROVIDER=huggingface`
+`EMBEDDING_MODEL=BAAI/bge-small-en-v1.5`
+`EMBEDDING_DIMENSIONS=384`
+`HF_TOKEN=<your Hugging Face token>`
+
+After enabling the provider, existing chunks can be upgraded without deleting the legacy vectors:
+
+`POST /api/v1/workspaces/{workspace_id}/reindex`
+
+The endpoint fills `semantic_embedding` in batches and reports how many chunks remain. The semantic column uses a pgvector HNSW cosine index, while the legacy deterministic vector remains available during the migration.
 
 Hugging Face Inference Providers exposes an OpenAI-compatible chat endpoint and currently provides a small free monthly inference credit for free accounts; usage beyond the included credit is billable, so the project keeps the provider configurable rather than coupling AtlasAI to one vendor. See the Hugging Face provider documentation for current model availability and pricing.
 
@@ -178,8 +194,10 @@ Local authentication is intentionally limited to development.
 - [ ] multimodal ingestion for images and scanned PDFs using a VLM/OCR path
 - [ ] document versioning and deduplication
 - [ ] asynchronous ingestion jobs for large files
-- [ ] semantic reranking
+- [x] semantic retrieval foundation + confidence-aware reranking
+  - [ ] cross-encoder semantic reranking
 - [ ] answer faithfulness/evaluation dashboard
+- [ ] retrieval benchmark suite with precision@k / recall@k / MRR
 - [ ] GitHub / Notion / web connectors
 - [ ] ACL-aware retrieval at chunk level
 - [ ] model comparison and cost analytics
