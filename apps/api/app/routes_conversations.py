@@ -47,12 +47,7 @@ def list_messages(conversation_id: UUID, db: Session = Depends(get_db), auth: Au
 
 
 @router.post("/conversations/{conversation_id}/messages", response_model=MessageRead, status_code=201)
-def create_message(
-    conversation_id: UUID,
-    payload: MessageCreate,
-    db: Session = Depends(get_db),
-    auth: AuthContext = Depends(require_auth),
-):
+def create_message(conversation_id: UUID, payload: MessageCreate, db: Session = Depends(get_db), auth: AuthContext = Depends(require_auth)):
     conversation = db.get(Conversation, conversation_id)
     if conversation is None:
         raise HTTPException(404, "Conversation not found")
