@@ -13,6 +13,7 @@ class ConversationRead(BaseModel):
 
     id: UUID
     workspace_id: UUID
+    title: str | None = None
     created_at: datetime | None = None
 
 
