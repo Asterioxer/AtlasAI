@@ -47,9 +47,20 @@ async def chat(
         db.add(conversation)
         db.flush()
 
-    lexical = lexical_search(db, str(workspace_id), payload.question)
-    dense = await vector_search(db, str(workspace_id), payload.question, embedding_provider)
-    hits = reranker.rerank(payload.question, reciprocal_rank_fusion(dense, lexical), 5)
+    # Lexical retrieval is the source of truth until real semantic embeddings
+    # are configured. The previous synthetic 8-D vectors were useful as a
+    # placeholder but could rank unrelated chunks above exact matches.
+    lexical = lexical_search(db, str(workspace_id), payload.question, limit=12)
+
+    if lexical:
+        dense = await vector_search(db, str(workspace_id), payload.question, embedding_provider, limit=12)
+        lexical_ids = {hit.chunk_id for hit in lexical}
+        dense_overlap = [hit for hit in dense if hit.chunk_id in lexical_ids]
+        candidates = reciprocal_rank_fusion(lexical, dense_overlap)
+    else:
+        candidates = []
+
+    hits = reranker.rerank(payload.question, candidates, 5)
     result = await generate_grounded_answer(payload.question, hits, provider)
 
     db.add(Message(conversation_id=conversation.id, role="user", content=payload.question))
