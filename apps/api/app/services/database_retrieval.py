@@ -34,18 +34,25 @@ async def vector_search(
     rows = db.execute(
         text("""
             SELECT c.id AS chunk_id, c.content AS content, s.id AS source_id, d.id AS document_id,
-                   1 - (c.embedding <=> CAST(:embedding AS vector)) AS score
+                   1 - (c.semantic_embedding <=> CAST(:embedding AS vector)) AS semantic_score
             FROM chunks c
             JOIN documents d ON d.id = c.document_id
             JOIN sources s ON s.id = d.source_id
             WHERE s.workspace_id = CAST(:workspace_id AS uuid)
-              AND c.embedding IS NOT NULL
-            ORDER BY c.embedding <=> CAST(:embedding AS vector)
+              AND c.semantic_embedding IS NOT NULL
+            ORDER BY c.semantic_embedding <=> CAST(:embedding AS vector)
             LIMIT :limit
         """),
         {"workspace_id": workspace_id, "embedding": vector, "limit": limit},
     )
     return [
-        RetrievalHit(str(r.chunk_id), float(r.score), str(r.source_id), str(r.document_id), str(r.content))
+        RetrievalHit(
+            str(r.chunk_id),
+            float(r.semantic_score),
+            str(r.source_id),
+            str(r.document_id),
+            str(r.content),
+            float(r.semantic_score),
+        )
         for r in rows
     ]
