@@ -14,7 +14,7 @@ _STOPWORDS = {
 def _terms(text: str) -> list[str]:
     return [
         token
-        for token in re.findall(r"[a-zA-Z0-9][a-zA-Z0-9+.#_-]*", text.lower())
+        for token in re.findall(r"[a-zA-Z0-9]+(?:[+#][a-zA-Z0-9]+)*", text.lower())
         if token not in _STOPWORDS
     ]
 
