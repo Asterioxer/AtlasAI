@@ -13,7 +13,6 @@ const API =
   (typeof window !== "undefined" && window.location.hostname !== "localhost"
     ? "https://atlasai-w5i8.onrender.com"
     : "http://localhost:8000");
-const TOKEN = process.env.NEXT_PUBLIC_ATLAS_TOKEN || "demo-user";
 
 const SUPPORTED_EXTENSIONS =
   ".pdf,.txt,.md,.markdown,.rst,.log,.csv,.tsv,.json,.yaml,.yml,.toml,.ini,.cfg,.conf,.xml,.html,.htm,.css,.js,.jsx,.ts,.tsx,.py,.java,.kt,.go,.rs,.c,.h,.cpp,.hpp,.cs,.php,.rb,.swift,.scala,.sql,.sh,.bash,.zsh,.ps1,.bat,.tex,.dockerfile,.rtf,.eml,.docx,.xlsx,.xls,.pptx,.odt,.ods,.odp,.epub";
@@ -35,25 +34,38 @@ function getExtension(name: string) {
 
 async function api(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${TOKEN}`);
-  if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
+  const token =
+    typeof window !== "undefined"
+      ? window.sessionStorage.getItem("atlasai_access_token")
+      : null;
+
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (init.body && !(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
 
   let response: Response;
   try {
     response = await fetch(`${API}${path}`, { ...init, headers });
   } catch {
-    throw new Error(`Cannot reach AtlasAI API at ${API}. Check the Render service and CORS configuration.`);
+    throw new Error(
+      `Cannot reach AtlasAI API at ${API}. Check the API deployment and CORS configuration.`,
+    );
   }
 
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
+  if (!response.ok) {
+    throw new Error(data.detail || `Request failed (${response.status})`);
+  }
   return data;
 }
 
 function localTitle(conversation: Conversation, messages: Message[]) {
   if (conversation.title?.trim()) return conversation.title.trim();
   const firstUser = messages.find((message) => message.role === "user");
-  if (firstUser?.content) return firstUser.content.slice(0, 34) + (firstUser.content.length > 34 ? "…" : "");
+  if (firstUser?.content) {
+    return firstUser.content.slice(0, 34) + (firstUser.content.length > 34 ? "…" : "");
+  }
   return "New thread";
 }
 
@@ -76,7 +88,8 @@ export default function ChatWorkspace() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const currentConversation = conversations.find((conversation) => conversation.id === conversationId) ?? null;
+  const currentConversation =
+    conversations.find((conversation) => conversation.id === conversationId) ?? null;
 
   async function selectConversation(id: string) {
     setConversationId(id);
@@ -95,8 +108,8 @@ export default function ChatWorkspace() {
           old.map((conversation) =>
             conversation.id === id && !conversation.title
               ? { ...conversation, title: firstUser.content.slice(0, 120) }
-              : conversation
-          )
+              : conversation,
+          ),
         );
       }
     } catch (e) {
@@ -114,7 +127,9 @@ export default function ChatWorkspace() {
     setSources(sourceRows);
     setConversations(conversationRows);
 
-    const targetId = preferredConversationId ?? conversationId ?? conversationRows[0]?.id ?? null;
+    const targetId =
+      preferredConversationId ?? conversationId ?? conversationRows[0]?.id ?? null;
+
     if (targetId) {
       await selectConversation(targetId);
     } else {
@@ -157,7 +172,10 @@ export default function ChatWorkspace() {
     setNotice("");
 
     try {
-      const row = await api(`/api/v1/workspaces/${workspace.id}/conversations`, { method: "POST" });
+      const row = await api(
+        `/api/v1/workspaces/${workspace.id}/conversations`,
+        { method: "POST" },
+      );
       setConversations((old) => [row, ...old]);
       setConversationId(row.id);
       setMessages([]);
@@ -178,7 +196,7 @@ export default function ChatWorkspace() {
     if (!SUPPORTED_SUFFIXES.has(extension)) {
       setFile(null);
       setError(
-        "Unsupported file type. AtlasAI accepts PDF, Office, spreadsheets, presentations, structured data, email, markup, source code, and ebook formats."
+        "Unsupported file type. AtlasAI accepts PDF, Office, spreadsheets, presentations, structured data, email, markup, source code, and ebook formats.",
       );
       return;
     }
@@ -207,7 +225,10 @@ export default function ChatWorkspace() {
       if (!source) {
         source = await api(`/api/v1/workspaces/${workspace.id}/sources`, {
           method: "POST",
-          body: JSON.stringify({ name: "Uploaded documents", source_type: "file" }),
+          body: JSON.stringify({
+            name: "Uploaded documents",
+            source_type: "file",
+          }),
         });
       }
 
@@ -220,8 +241,13 @@ export default function ChatWorkspace() {
       });
 
       setFile(null);
-      setLastUpload({ title: result.title, chunks: result.chunks_created });
-      setNotice(`Indexed “${result.title}” into ${result.chunks_created} knowledge chunks.`);
+      setLastUpload({
+        title: result.title,
+        chunks: result.chunks_created,
+      });
+      setNotice(
+        `Indexed “${result.title}” into ${result.chunks_created} knowledge chunks.`,
+      );
       await refresh(workspace.id, conversationId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -255,21 +281,36 @@ export default function ChatWorkspace() {
       setCitations(data.citations || []);
       setMessages((old) => [
         ...old,
-        { id: crypto.randomUUID(), role: "user", content: submittedQuestion },
-        { id: crypto.randomUUID(), role: "assistant", content: data.answer },
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: submittedQuestion,
+        },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: data.answer,
+        },
       ]);
 
       setConversations((old) =>
         old.map((conversation) =>
           conversation.id === data.conversation_id
-            ? { ...conversation, title: conversation.title || submittedQuestion.slice(0, 120) }
-            : conversation
-        )
+            ? {
+                ...conversation,
+                title: conversation.title || submittedQuestion.slice(0, 120),
+              }
+            : conversation,
+        ),
       );
 
       if (!conversations.some((conversation) => conversation.id === data.conversation_id)) {
         setConversations((old) => [
-          { id: data.conversation_id, workspace_id: workspace.id, title: submittedQuestion.slice(0, 120) },
+          {
+            id: data.conversation_id,
+            workspace_id: workspace.id,
+            title: submittedQuestion.slice(0, 120),
+          },
           ...old,
         ]);
       }
@@ -306,7 +347,9 @@ export default function ChatWorkspace() {
 
         <div className="conversation-list">
           {conversations.length === 0 ? (
-            <div className="empty-state">No threads yet. Start one with + or New thread.</div>
+            <div className="empty-state">
+              No threads yet. Start one with + or New thread.
+            </div>
           ) : (
             conversations.map((conversation) => (
               <button
@@ -317,10 +360,14 @@ export default function ChatWorkspace() {
                 disabled={busy}
               >
                 <span className="conversation-name">
-                  {localTitle(conversation, conversation.id === conversationId ? messages : [])}
+                  {localTitle(
+                    conversation,
+                    conversation.id === conversationId ? messages : [],
+                  )}
                 </span>
                 <span className="conversation-id">
-                  {conversation.id.slice(0, 8)} · {conversation.id === conversationId ? "active" : "thread"}
+                  {conversation.id.slice(0, 8)} ·{" "}
+                  {conversation.id === conversationId ? "active" : "thread"}
                 </span>
               </button>
             ))
@@ -407,10 +454,16 @@ export default function ChatWorkspace() {
         <div className="chat-topbar">
           <div>
             <h2 className="chat-heading">
-              {currentConversation ? currentConversation.title || "Knowledge chat" : "New knowledge chat"}
+              {currentConversation
+                ? currentConversation.title || "Knowledge chat"
+                : "New knowledge chat"}
             </h2>
             <span className="chat-meta">
-              {booting ? "Connecting to AtlasAI…" : workspace ? workspace.name : "Workspace unavailable"}
+              {booting
+                ? "Connecting to AtlasAI…"
+                : workspace
+                  ? workspace.name
+                  : "Workspace unavailable"}
             </span>
           </div>
 
@@ -431,7 +484,11 @@ export default function ChatWorkspace() {
           {messages.length === 0 ? (
             <div className="welcome-card">
               <div className="welcome-icon">✦</div>
-              <h3>{currentConversation ? "This thread is ready." : "Ask AtlasAI anything in your knowledge base."}</h3>
+              <h3>
+                {currentConversation
+                  ? "This thread is ready."
+                  : "Ask AtlasAI anything in your knowledge base."}
+              </h3>
               <p>
                 {currentConversation
                   ? "This is an independent conversation. Ask a question and its messages will stay inside this thread."
@@ -440,7 +497,10 @@ export default function ChatWorkspace() {
             </div>
           ) : (
             messages.slice(-12).map((message) => (
-              <div key={message.id} className={`message ${message.role === "user" ? "user" : ""}`}>
+              <div
+                key={message.id}
+                className={`message ${message.role === "user" ? "user" : ""}`}
+              >
                 <div className="avatar">{message.role === "user" ? "Y" : "A"}</div>
                 <div className="bubble">{message.content}</div>
               </div>
@@ -452,7 +512,11 @@ export default function ChatWorkspace() {
           <input
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
-            placeholder={workspace ? "Ask about your indexed knowledge…" : "Connecting to workspace…"}
+            placeholder={
+              workspace
+                ? "Ask about your indexed knowledge…"
+                : "Connecting to workspace…"
+            }
             className="composer-input"
             disabled={busy || !workspace}
           />
@@ -490,15 +554,23 @@ export default function ChatWorkspace() {
               <div key={citation.chunk_id} className="citation-card">
                 <div className="citation-top">
                   <span className="citation-label">SOURCE {index + 1}</span>
-                  <span className="score">{citation.score.toFixed(3)} match</span>
+                  <span className="score">
+                    {citation.score.toFixed(3)} match
+                  </span>
                 </div>
-                <div className="citation-id">chunk {citation.chunk_id.slice(0, 12)}…</div>
-                <div className="citation-id">document {citation.document_id.slice(0, 12)}…</div>
+                <div className="citation-id">
+                  chunk {citation.chunk_id.slice(0, 12)}…
+                </div>
+                <div className="citation-id">
+                  document {citation.document_id.slice(0, 12)}…
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="empty-state">Ask a question to inspect retrieved evidence and citation scores.</div>
+          <div className="empty-state">
+            Ask a question to inspect retrieved evidence and citation scores.
+          </div>
         )}
       </aside>
     </div>
