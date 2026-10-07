@@ -36,6 +36,11 @@ embedding_provider = build_embedding_provider(
 reranker = Reranker()
 
 
+def _conversation_title(question: str) -> str:
+    normalized = " ".join(question.split())
+    return normalized[:117] + "…" if len(normalized) > 120 else normalized
+
+
 @router.post("/workspaces/{workspace_id}/chat", response_model=ChatResponse)
 async def chat(
     workspace_id: UUID,
@@ -51,9 +56,14 @@ async def chat(
     if conversation is not None and conversation.workspace_id != workspace_id:
         raise HTTPException(400, "Conversation does not belong to workspace")
     if conversation is None:
-        conversation = Conversation(workspace_id=workspace_id)
+        conversation = Conversation(
+            workspace_id=workspace_id,
+            title=_conversation_title(payload.question),
+        )
         db.add(conversation)
         db.flush()
+    elif not conversation.title:
+        conversation.title = _conversation_title(payload.question)
 
     lexical = lexical_search(db, str(workspace_id), payload.question, limit=16)
 
@@ -61,7 +71,6 @@ async def chat(
         dense = await vector_search(db, str(workspace_id), payload.question, embedding_provider, limit=16)
         candidates = reciprocal_rank_fusion(lexical, dense)
     else:
-        # Synthetic vectors are intentionally excluded from retrieval.
         candidates = lexical
 
     hits = reranker.rerank(payload.question, candidates, 5)
