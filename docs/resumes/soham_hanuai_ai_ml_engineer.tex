@@ -1,0 +1,176 @@
+%-------------------------
+% HanuAI AI/ML Engineer Resume — Soham Mukherjee
+% One-page compact version based on the original resume template.
+% Compile with pdfLaTeX.
+%-------------------------
+
+\documentclass[a4paper,10.5pt]{article}
+
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{fontawesome5}
+\usepackage{tabularx}
+\usepackage[T1]{fontenc}
+\usepackage{xcolor}
+
+\geometry{left=1.2cm, top=0.8cm, right=1.2cm, bottom=0.8cm}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\setlength{\tabcolsep}{0in}
+\raggedright
+\urlstyle{same}
+
+\titleformat{\section}
+{\scshape\raggedright\normalsize}
+{}{0em}{}
+[\color{black}\titlerule \vspace{-6pt}]
+
+\renewcommand{\labelitemi}{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{
+\begin{itemize}[leftmargin=*, itemsep=0pt, parsep=0pt, topsep=0pt]
+}
+\newcommand{\resumeSubHeadingListEnd}{
+\end{itemize}\vspace{-3mm}
+}
+\newcommand{\resumeItemListStart}{
+\begin{itemize}[leftmargin=3ex, itemsep=0pt, parsep=0pt, topsep=0pt]
+\small
+}
+\newcommand{\resumeItemListEnd}{
+\end{itemize}\vspace{-1mm}
+}
+\newcommand{\resumeSubheading}[4]{
+\item
+\begin{tabular*}{0.98\textwidth}[t]{l@{\extracolsep{\fill}}r}
+\textbf{#1} & \textit{\footnotesize #4} \\
+\textit{\footnotesize #2} & \footnotesize #3
+\end{tabular*}
+\vspace{-2mm}
+}
+\newcommand{\resumeProject}[4]{
+\item
+\begin{tabular*}{0.98\textwidth}[t]{l@{\extracolsep{\fill}}r}
+\textbf{#1} & \textit{\footnotesize #3} \\
+\footnotesize\textit{#2} & \footnotesize #4
+\end{tabular*}
+\vspace{-2mm}
+}
+
+\begin{document}
+\fontfamily{cmr}\selectfont
+
+\begin{center}
+{\Large \textbf{Soham Mukherjee}} \\[2pt]
+{\small +91-9065349149} \\[4pt]
+{\footnotesize
+\faEnvelope\ \href{mailto:sohamaxpauli@gmail.com}{sohamaxpauli@gmail.com} \quad | \quad
+\faGithub\ \href{https://github.com/Asterioxer}{GitHub} \quad | \quad
+\faLinkedin\ \href{https://www.linkedin.com/in/soham-m-40002b283/}{LinkedIn} \quad | \quad
+\faCode\ \href{https://leetcode.com/u/Scadiva/}{LeetCode} \quad | \quad
+\faLaptopCode\ \href{https://codeforces.com/profile/Scadiva}{Codeforces}
+\end{center}
+
+\vspace{-4mm}
+
+\section{}
+AI-focused software developer with hands-on experience building LLM-powered applications, retrieval-augmented generation (RAG) workflows, and ML-driven analytics. Experienced in Python backend development, model evaluation, SQL safety validation, and integrating AI capabilities into usable applications. Combines analytical problem-solving with production-minded engineering, automated testing, and observability.
+
+\vspace{-2mm}
+
+\section{Education}
+\resumeSubHeadingListStart
+\resumeSubheading
+{B.Tech in CSE (Data Science)}
+{Gandhi Engineering College, Bhubaneswar}
+{2023 -- 2027}
+{CGPA: 8.9}
+\resumeSubheading
+{Class XII}
+{Sri Chaitanya Techno School}
+{2020 -- 2022}
+{82\%}
+\resumeSubHeadingListEnd
+
+\section{Technical Skills}
+\begin{itemize}[leftmargin=0.1in, itemsep=0pt, parsep=0pt, topsep=0pt]
+\small
+\item \textbf{AI/ML:} LLMs, RAG, AI agents, LangChain, Ollama, FAISS, Isolation Forest, LSTM, ARIMA, model evaluation
+\item \textbf{Languages:} Python, Java, JavaScript, C/C++
+\item \textbf{Backend/Web:} FastAPI, REST APIs, SQLAlchemy, React, Streamlit, Pydantic
+\item \textbf{Data/Tools:} SQLite, PostgreSQL, Supabase, Pandas, NumPy, scikit-learn, pytest, Kafka, Docker, Git
+\item \textbf{Coursework:} Data Structures and Algorithms, OOP, DBMS, Operating Systems, System Design
+\end{itemize}
+
+\vspace{-2mm}
+
+\section{Projects}
+\resumeSubHeadingListStart
+
+\resumeProject
+{\href{https://github.com/Asterioxer/nl-to-sql-portfolio-site}{NL-to-SQL Assistant -- AI Querying \& Evaluation}}
+{Schema-aware local LLM agent with SQL safety guardrails}
+{2026}
+{}
+\resumeItemListStart
+\item Built a portfolio documenting a Python/LangChain natural-language-to-SQL assistant using a local Qwen2.5:7b model via Ollama, FAISS retrieval, and SQLite.
+\item Implemented schema-aware context retrieval and a hand-written SQL validator that permits only a single safe SELECT statement before execution.
+\item Created evaluation tooling and documented failure modes; the latest recorded 18-question run scored 10/18 (55.6\%), exposing run-to-run variance and incorrect answers for further investigation.
+\item Tech: Python, LangChain, Ollama, FAISS, SQLite, React, Vite.
+\resumeItemListEnd
+
+\resumeProject
+{\href{https://github.com/Asterioxer/ZombieGuard_Insiders}{ZombieGuard -- AI API Security Platform}}
+{Real-time API discovery and anomaly detection | Union Bank of India iDEA 2.0 (PS9)}
+{2026}
+{}
+\resumeItemListStart
+\item Built a FastAPI backend and SQLAlchemy layer for a five-channel log-ingestion pipeline using a simulated Kafka stream bus.
+\item Integrated a seven-feature Isolation Forest classifier and a 30-day LSTM model; threat scoring used NumPy-vectorised CVSS calculations and completed in under three seconds in the tested setup.
+\item Added automated defence workflows and a 60-test pytest suite with all tests passing across the tested ML, database, parser, and API layers.
+\item Tech: Python, FastAPI, scikit-learn, NumPy, SQLAlchemy, Pydantic, Kafka, pytest.
+\resumeItemListEnd
+
+\resumeProject
+{\href{https://asterioxer-stockgro-dashboardapp-sgci6z.streamlit.app/}{StockGro -- Quantitative Finance Platform}}
+{Time-series forecasting and portfolio optimisation}
+{2025 -- 2026}
+{}
+\resumeItemListStart
+\item Built ARIMA and LSTM forecasting workflows using historical NSE data; evaluated predictions using RMSE and directional accuracy.
+\item Implemented mean-variance portfolio optimisation with an Efficient Frontier and maximum-Sharpe-ratio allocation in a simulated portfolio environment.
+\item Delivered a five-tab Streamlit dashboard for asset analytics, volatility, forecasts, portfolio optimisation, and execution evidence.
+\item Tech: Python, ARIMA, LSTM, yfinance, Streamlit, Pandas, NumPy, Matplotlib.
+\resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
+\section{Experience}
+\resumeSubHeadingListStart
+\resumeSubheading
+{DevOps \& DevSecOps Intern}
+{Springer Capital Investments LLC}
+{Jan 2026 -- Apr 2026}
+{Remote}
+\resumeItemListStart
+\item Designed an 11-node distributed cluster using Consul, Vault, and Nomad with mutual TLS, dynamic PostgreSQL credentials, and OIDC/AWS IAM authentication; deployed locally and through Terraform on AWS.
+\item Evaluated 11 SAST tools and built reusable GitHub Actions workflows and automated pull-request quality gates for high/critical vulnerabilities.
+\item Implemented centralized log observability with Grafana Loki and LogQL, plus resource-constrained, non-root Nomad workloads.
+\resumeItemListEnd
+\resumeSubHeadingListEnd
+
+\section{Certifications \& Achievements}
+\begin{itemize}[leftmargin=0.15in, itemsep=0pt, parsep=0pt, topsep=0pt]
+\small
+\item \textbf{OCI Generative AI Professional} -- 100\% score; \href{https://catalog-education.oracle.com/pls/certview/sharebadge?id=DADF9704A57127C47353CA83A73224FA5BBA23ABCFC48F7E95CF32EDB9CC8815}{Verification}
+\item \textbf{OCI Data Science Professional} -- \href{https://catalog-education.oracle.com/pls/certview/sharebadge?id=438920B2C0C8FE12FF5756DFCAED07CE9ADF4C83C3CF14EDF27F7F038DD9F432}{Verification}; OCI AI Foundations
+\item \textbf{Union Bank of India iDEA 2.0 Hackathon} -- Team Insiders, Backend Developer; built ZombieGuard AI API security prototype.
+\end{itemize}
+
+\end{document}
